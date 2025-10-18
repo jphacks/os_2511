@@ -10,54 +10,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.8.162/pdf.min.js"></script>
   <!-- Tesseract.js -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
-
-  <style>
-    @keyframes toastIn {
-      from {
-        transform: translateY(-8px);
-        opacity: 0
-      }
-
-      to {
-        transform: translateY(0);
-        opacity: 1
-      }
-    }
-
-    @keyframes toastOut {
-      from {
-        opacity: 1
-      }
-
-      to {
-        opacity: 0
-      }
-    }
-
-    .toast-show {
-      animation: toastIn 240ms ease forwards;
-    }
-
-    .toast-hide {
-      animation: toastOut 240ms ease forwards;
-    }
-
-    .drag-over {
-      box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15);
-      border-color: rgb(59 130 246);
-    }
-
-    .page-wrapper {
-      margin-bottom: 12px;
-    }
-
-    .pdf-page-canvas {
-      display: block;
-      border: 1px solid #e5e7eb;
-      border-radius: 4px;
-      max-width: 100%;
-    }
-  </style>
 </head>
 
 <body class="min-h-screen bg-gray-50 font-sans">
@@ -178,7 +130,7 @@
     </div>
   </div>
 
-  <script src="main.js"></script>
+  <script src="main.js" type="text/css" href="main.css"></script>
 </body>
 
 </html>
