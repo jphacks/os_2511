@@ -1,0 +1,35 @@
+    @keyframes toastIn {
+      from {
+        transform: translateY(-8px);
+        opacity: 0
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1
+      }
+    }
+
+    @keyframes toastOut {
+      from {
+        opacity: 1
+      }
+
+      to {
+        opacity: 0
+      }
+    }
+
+    .toast-show {
+      animation: toastIn 240ms ease forwards;
+    }
+
+    .toast-hide {
+      animation: toastOut 240ms ease forwards;
+    }
+
+    /* ドラッグ中の枠強調 */
+    .drag-over {
+      box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15);
+      border-color: rgb(59 130 246);
+    }

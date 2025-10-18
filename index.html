@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PDF 引用ジェネレータ（OCR対応デモ）</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- pdf.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.8.162/pdf.min.js"></script>
+  <!-- Tesseract.js -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+
+  <style>
+    @keyframes toastIn {
+      from {
+        transform: translateY(-8px);
+        opacity: 0
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1
+      }
+    }
+
+    @keyframes toastOut {
+      from {
+        opacity: 1
+      }
+
+      to {
+        opacity: 0
+      }
+    }
+
+    .toast-show {
+      animation: toastIn 240ms ease forwards;
+    }
+
+    .toast-hide {
+      animation: toastOut 240ms ease forwards;
+    }
+
+    .drag-over {
+      box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15);
+      border-color: rgb(59 130 246);
+    }
+
+    .page-wrapper {
+      margin-bottom: 12px;
+    }
+
+    .pdf-page-canvas {
+      display: block;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      max-width: 100%;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-gray-50 font-sans">
+  <div id="toast"
+    class="fixed top-6 left-1/2 -translate-x-1/2 z-50 hidden bg-gray-900 text-white px-4 py-2 rounded-md shadow"></div>
+
+  <div class="container mx-auto px-4 py-8 max-w-6xl">
+    <div class="text-center mb-6">
+      <h1 class="text-2xl font-bold">PDF 引用ジェネレータ（OCR対応デモ）</h1>
+      <p class="text-sm text-gray-600">PDF→テキスト（座標付き）＋OCRフォールバック。ページクリックで一文取得。</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="md:col-span-1">
+        <div id="uploader" class="p-4 bg-white rounded-lg border border-dashed border-gray-300 text-center"
+          style="min-height:220px;">
+          <input id="fileInput" type="file" accept="application/pdf" class="hidden" />
+          <div id="dropArea" class="h-full flex flex-col items-center justify-center">
+            <p class="text-gray-500 mb-2">ここにドラッグ＆ドロップ</p>
+            <button id="chooseBtn" class="px-4 py-2 bg-blue-500 text-white rounded">ファイルを選択</button>
+            <p class="text-xs text-gray-400 mt-3">または PDF をここへドロップしてください</p>
+          </div>
+        </div>
+
+        <div class="mt-4 p-4 bg-white rounded-lg shadow-sm">
+          <h3 class="text-gray-900 mb-2">現在のファイル</h3>
+          <p id="fileName" class="text-gray-600">未選択</p>
+          <p id="fileSize" class="text-gray-500 text-sm mt-1">-</p>
+
+          <div class="mt-4 flex gap-2">
+            <button id="resetBtn"
+              class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-700">別のPDFを選択</button>
+            <a id="downloadLink" class="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm text-center"
+              download>ダウンロード</a>
+          </div>
+
+          <div class="mt-4">
+            <label class="text-xs text-gray-500">OCR 言語</label>
+            <select id="ocrLang" class="w-full mt-1 p-2 border rounded text-sm">
+              <option value="jpn" selected>日本語 (jpn)</option>
+              <option value="eng">英語 (eng)</option>
+            </select>
+            <label class="inline-flex items-center gap-2 mt-2 text-sm">
+              <input type="checkbox" id="autoOcr" checked />
+              <span>自動でOCRフォールバックする</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2">
+        <div class="p-4 bg-white rounded-lg shadow-sm" style="min-height:420px; display:flex; flex-direction:column;">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-gray-900">PDF プレビュー（クリックで一文取得）</h3>
+            <div class="text-sm text-gray-500" id="status">ファイル未選択</div>
+          </div>
+
+          <div id="viewerWrap" class="flex-1 bg-gray-50 border border-gray-200 rounded overflow-auto mb-4"
+            style="padding:8px;">
+            <div id="viewer" class="space-y-6"></div>
+          </div>
+
+          <div id="extractor" class="p-3 bg-white rounded-md border">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="font-semibold">抽出 / 引用生成</h4>
+              <div class="text-sm text-gray-500" id="extractStatus">未抽出</div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div class="md:col-span-2">
+                <div class="mb-2">
+                  <label class="text-sm text-gray-600">キーワード（任意）</label>
+                  <input id="keywordInput" class="w-full mt-1 p-2 border rounded" placeholder="例: センサー, エラー" />
+                </div>
+
+                <div class="mb-2">
+                  <label class="text-sm text-gray-600">抽出されたテキスト（一部）</label>
+                  <textarea id="extractedText" rows="6" class="w-full mt-1 p-2 border rounded font-sans text-sm"
+                    readonly></textarea>
+                </div>
+
+                <div class="flex gap-2">
+                  <button id="doExtract" class="px-4 py-2 bg-blue-500 text-white rounded">全文抽出（表示）</button>
+                  <button id="genQuotes" class="px-4 py-2 bg-green-600 text-white rounded">引用を自動生成</button>
+                  <button id="clearExtract" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">クリア</button>
+                </div>
+              </div>
+
+              <div class="md:col-span-1">
+                <div class="mb-2 text-sm text-gray-600">設定</div>
+                <div class="space-y-2">
+                  <div>
+                    <label class="text-xs text-gray-500">最小文字数</label>
+                    <input id="minLen" type="number" value="15" class="w-full mt-1 p-1 border rounded text-sm" />
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">最大文字数</label>
+                    <input id="maxLen" type="number" value="160" class="w-full mt-1 p-1 border rounded text-sm" />
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">候補数</label>
+                    <input id="numCandidates" type="number" value="6" class="w-full mt-1 p-1 border rounded text-sm" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-3" />
+            <div>
+              <h5 class="text-md font-medium mb-2">生成された引用候補（クリックでコピー）</h5>
+              <div id="quotesArea" class="space-y-2"></div>
+            </div>
+
+            <div class="mt-3 text-sm text-gray-500">選択中の文字数: <span id="selectionCount">0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+
+</html>
