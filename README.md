@@ -1,4 +1,4 @@
-# サンプル（プロダクト名）
+# PDFACTER
 
 [![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2025/05/JPHACKS2025_ogp.jpg)](https://www.youtube.com/watch?v=lA9EluZugD8)
 
@@ -6,6 +6,9 @@
 ### 背景(製品開発のきっかけ、課題等）
 ### 製品説明（具体的な製品の説明）
 学生のレポート作成支援をする際に、PDFファイルを、引用しやすいまた、新たにPDFファイルから文書を作成しやすいようにすることが可能にする機能が搭載されています。
+[サンプル動画](./movePDFACTER.mp4)
+
+
 
 ### 特長
 #### 1. 特長1
