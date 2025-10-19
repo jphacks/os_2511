@@ -1,0 +1,74 @@
+/* ベース */
+body { font-family: system-ui, sans-serif; margin: 20px; }
+
+/* 上部の操作行 */
+.row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+
+.gradient-text {
+  background: linear-gradient(90deg, #00c6ff, #0072ff); 
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+/* ボタン */
+button { 
+  background: linear-gradient(45deg, #00b4db, #0083b0);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+/* 結果テキストエリア */
+textarea { width: 100%; height: 50vh; white-space: pre-wrap; border: 5px solid #3eb8ff; border-radius: 10px;}
+
+/* ログ（小さめ等幅フォント） */
+.log { margin-top: 12px; font: 12px/1.4 monospace; }
+
+/* カード一覧 */
+.lines-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+/* カード */
+.line-card {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+/* カード内テキスト */
+.line-card .text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+}
+
+/* カード下メタ行 */
+.line-card .meta {
+  margin-top: 8px;
+  font: 12px/1.2 system-ui, sans-serif;
+  color: #555;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+/* 左側のバッジ束 */
+.meta .left { display: inline-flex; gap: 6px; }
+
+/* バッジ */
+.badge {
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: #f8f8f8;
+}

@@ -1,0 +1,107 @@
+// citationExtractor.js
+
+/**
+ * ハイブリッド方式で論文メタ情報を抽出
+ * 入力: pdf.js getTextContent().items を整形した blocks[]
+ * 出力: JSONオブジェクト
+ *
+ * block = { text, fontSize, x, y, page }
+ */
+
+export function extractCitationInfoFromBlocks(blocks) {
+  const info = {
+    title: null,
+    authors: [],
+    year: null,
+    journal: null,
+    volume: null,
+    issue: null,
+    pages: null,
+    doi: null
+  };
+
+  if (!blocks || blocks.length === 0) return info;
+
+  // -------------------
+  // 1. DOI抽出
+  // -------------------
+  const doiRegex = /\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i;
+  for (const b of blocks) {
+    const match = b.text.match(doiRegex);
+    if (match) {
+      info.doi = match[0];
+      break;
+    }
+  }
+
+  // -------------------
+  // 2. タイトル抽出（フォントサイズ最大を候補）
+  // -------------------
+  const maxFontSize = Math.max(...blocks.map(b => b.fontSize));
+  // 最大フォント行を抽出
+  const titleBlocks = blocks.filter(b => b.fontSize === maxFontSize && b.text.length > 5);
+  info.title = titleBlocks.map(b => b.text.trim()).join(" ");
+
+  // -------------------
+  // 3. 著者名抽出（タイトル直下、小さめフォント）
+  // -------------------
+  const titleMaxY = Math.max(...titleBlocks.map(b => b.y));
+  // タイトルより下で、フォントサイズがタイトルより小さい行を候補
+  const authorCandidates = blocks.filter(
+    b => b.y > titleMaxY && b.fontSize < maxFontSize && b.text.length > 3
+  );
+
+  const authorRegex = /([A-Z][a-zA-Z\-]+(?:,?\s[A-Z]\.?)?)/g; // 英語名
+  const japaneseAuthorRegex = /[^\s\d]{2,}(?:\s[^\s\d]{1,})?/g; // 日本語名
+
+  for (const b of authorCandidates) {
+    let matches = b.text.match(authorRegex);
+    if (!matches) matches = b.text.match(japaneseAuthorRegex);
+    if (matches) {
+      matches.forEach(m => {
+        m = m.trim();
+        if (m && !info.authors.includes(m)) info.authors.push(m);
+      });
+    }
+    if (info.authors.length > 0) break; // 最初の候補ブロックで確定
+  }
+
+  // -------------------
+  // 4. 発行年抽出
+  // -------------------
+  const yearRegex = /\b(19|20)\d{2}\b/;
+  for (const b of blocks) {
+    const match = b.text.match(yearRegex);
+    if (match) {
+      info.year = match[0];
+      break;
+    }
+  }
+
+  // -------------------
+  // 5. ジャーナル名・巻号・ページ推定
+  // -------------------
+  // DOIがあれば DOIの前後を参照
+  if (info.doi) {
+    const doiIndex = blocks.findIndex(b => b.text.includes(info.doi));
+    const surrounding = blocks.slice(Math.max(0, doiIndex - 3), doiIndex);
+    if (surrounding.length > 0) {
+      info.journal = surrounding[surrounding.length - 1].text.trim();
+      // 巻号ページ抽出
+      const volIssueMatch = info.journal.match(/Vol\.?\s*(\d+)\s*\(?(.*?)\)?/i);
+      if (volIssueMatch) {
+        info.volume = volIssueMatch[1];
+        info.issue = volIssueMatch[2] || null;
+      }
+      const pagesMatch = info.journal.match(/pp?\.?\s*(\d+\s*[-–]\s*\d+)/i);
+      if (pagesMatch) info.pages = pagesMatch[1];
+    }
+  }
+
+  return info;
+}
+
+// Node.js 形式
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { extractCitationInfoFromBlocks };
+}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>PDF 文字列抽出</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <h1 class="gradient-text">スマートPDFアダプター</h1>
+
+  <div class="row">
+    <input type="file" id="file" accept="application/pdf" />
+    <button id="extract" disabled>抽出（全ページ）</button>
+    <button id="save" disabled>テキスト保存</button>
+  </div>
+
+  <!-- 1文=1カード -->
+  <div id="lines" class="lines-grid" aria-live="polite"></div>
+
+  <!-- 抽出結果のテキスト一覧 -->
+  <textarea id="out" placeholder="抽出結果" readonly></textarea>
+
+  <!-- ログ -->
+  <div id="log" class="log"></div>
+
+  <!-- JSはtype=moduleのまま -->
+  <script type="module" src="./function/find_headers3.js"></script>
+</body>
+</html>

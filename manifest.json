@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "提言団体 PDF Extractor Viewer",
+  "version": "1.0",
+  "description": "インターネット上のPDFファイルをカスタムビューアで自動的に開き、メタデータ抽出を行います。",
+  "permissions": [
+    "tabs",
+    "webRequest",
+    "storage",
+    "declarativeNetRequest" // PDFビューアのオーバーライドに推奨
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*/*.pdf", "file://*/*.pdf"], 
+      "run_at": "document_start", 
+      "js": ["contentScript.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "viewer/viewer.html",
+        "viewer/build/pdf.mjs",
+        "viewer/build/pdf.worker.mjs",
+        "viewer/find_headers3.js",
+        "viewer/citationExtractor.js",
+        "viewer/style.css" 
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
