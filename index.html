@@ -1,149 +1,691 @@
 <!doctype html>
-<html>
+<html lang="ja">
 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PDF 引用ジェネレータ（OCR対応デモ）</title>
-  <script src="https://cdn.tailwindcss.com"></script> <!-- pdf.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.8.162/pdf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
-  <script src="main.js"></script>
-
+  <title>PDF OCR Demo — pdf.js + tesseract.js（引用抽出＆空白ツール復活）</title>
   <style>
-    @keyframes toastIn {
-      from {
-        transform: translateY(-8px);
-        opacity: 0
-      }
-
-      to {
-        transform: translateY(0);
-        opacity: 1
-      }
+    :root {
+      --bg: #0f1724;
+      --card: #0b1220;
+      --accent: #6ee7b7;
+      --muted: #94a3b8
     }
 
-    @keyframes toastOut {
-      from {
-        opacity: 1
-      }
-
-      to {
-        opacity: 0
-      }
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Roboto, "Helvetica Neue", Arial
     }
 
-    .toast-show {
-      animation: toastIn 240ms ease forwards;
+    body {
+      background: linear-gradient(180deg, #071028 0%, #081226 60%);
+      color: #e6eef6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px
     }
 
-    .toast-hide {
-      animation: toastOut 240ms ease forwards;
+    .wrap {
+      width: 960px;
+      max-width: 96%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.04));
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6)
     }
 
-    .drag-over {
-      box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15);
-      border-color: rgb(59 130 246);
+    h1 {
+      margin: 0 0 12px;
+      font-size: 20px
     }
 
-    .page-wrapper {
-      margin-bottom: 12px;
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 18px
     }
 
-    .pdf-page-canvas {
-      display: block;
-      border: 1px solid #e5e7eb;
-      border-radius: 4px;
+    .uploader {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(0, 0, 0, 0.02));
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      padding: 14px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 220px;
+      position: relative;
+      overflow: hidden
+    }
+
+    .uploader.drag {
+      outline: 3px dashed rgba(110, 231, 183, 0.14);
+      transform: scale(1.01);
+      transition: transform .18s
+    }
+
+    .uploader .icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 12px;
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #022;
+      box-shadow: 0 6px 18px rgba(99, 102, 241, 0.12)
+    }
+
+    .uploader p {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center
+    }
+
+    .uploader input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    .panel {
+      background: #031124;
+      border-radius: 10px;
+      padding: 12px;
+      min-height: 360px;
+      display: flex;
+      flex-direction: column
+    }
+
+    canvas {
       max-width: 100%;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      background: white
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px
+    }
+
+    .progress {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 8px
+    }
+
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+      transition: width .25s ease
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 4px solid rgba(255, 255, 255, 0.06);
+      border-top-color: var(--accent);
+      animation: spin 1s linear infinite;
+      margin-left: 6px
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    textarea {
+      flex: 1;
+      background: transparent;
+      color: #dff6ea;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      padding: 10px;
+      border-radius: 8px;
+      resize: vertical;
+      font-family: ui-monospace, monospace
+    }
+
+    .footer {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .pulse {
+      animation: pulse 1.8s ease-in-out infinite
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: translateY(0)
+      }
+
+      50% {
+        transform: translateY(-4px)
+      }
+
+      100% {
+        transform: translateY(0)
+      }
+    }
+
+    .btn {
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+      color: #022;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer
+    }
+
+    .btn:active {
+      transform: translateY(1px)
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    .refs {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      max-height: 240px;
+      overflow: auto
+    }
+
+    .refItem {
+      padding: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03)
+    }
+
+    .sentence-list {
+      margin-top: 8px;
+      max-height: 240px;
+      overflow: auto;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.01)
+    }
+
+    .sentence-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 6px;
+      border-radius: 6px
+    }
+
+    .sentence-text {
+      flex: 1;
+      color: #dff6ea;
+      white-space: pre-wrap
+    }
+
+    .tools-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px
+    }
+
+    @media (max-width:900px) {
+      .grid {
+        grid-template-columns: 1fr;
+        grid-auto-rows: auto
+      }
     }
   </style>
 </head>
 
-<body class="min-h-screen bg-gray-50 font-sans">
-  <div id="toast"
-    class="fixed top-6 left-1/2 -translate-x-1/2 z-50 hidden bg-gray-900 text-white px-4 py-2 rounded-md shadow"></div>
-  <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <div class="text-center mb-6">
-      <h1 class="text-2xl font-bold">PDF 引用ジェネレータ（OCR対応デモ）</h1>
-      <p class="text-sm text-gray-600">PDF→テキスト（座標付き）＋OCRフォールバック。ページクリックで一文取得。</p>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="md:col-span-1">
-        <div id="uploader" class="p-4 bg-white rounded-lg border border-dashed border-gray-300 text-center"
-          style="min-height:220px;"> <input id="fileInput" type="file" accept="application/pdf" class="hidden" />
-          <div id="dropArea" class="h-full flex flex-col items-center justify-center">
-            <p class="text-gray-500 mb-2">ここにドラッグ＆ドロップ</p> <button id="chooseBtn"
-              class="px-4 py-2 bg-blue-500 text-white rounded">ファイルを選択</button>
-            <p class="text-xs text-gray-400 mt-3">または PDF をここへドロップしてください</p>
+<body>
+  <div class="wrap">
+    <h1>PDF OCR Demo（pdf.js + Tesseract.js）— 参考文献自動生成付き</h1>
+    <div class="grid">
+      <div>
+        <div id="drop" class="uploader">
+          <div class="icon pulse">PDF</div>
+          <p>ここに PDF をドラッグ&ドロップ、またはクリックして選択してください<br><span class="small">（画像化された論文ページでも OCR）</span></p>
+          <input id="file" type="file" accept="application/pdf" />
+          <div id="status" class="status">準備完了</div>
+          <div class="progress" style="width:90%">
+            <div id="progressBar" class="bar"></div>
           </div>
         </div>
-        <div class="mt-4 p-4 bg-white rounded-lg shadow-sm">
-          <h3 class="text-gray-900 mb-2">現在のファイル</h3>
-          <p id="fileName" class="text-gray-600">未選択</p>
-          <p id="fileSize" class="text-gray-500 text-sm mt-1">-</p>
-          <div class="mt-4 flex gap-2"> <button id="resetBtn"
-              class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm text-gray-700">別のPDFを選択</button> <a
-              id="downloadLink" class="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm text-center"
-              download>ダウンロード</a> </div>
-          <div class="mt-4"> <label class="text-xs text-gray-500">OCR 言語</label> <select id="ocrLang"
-              class="w-full mt-1 p-2 border rounded text-sm">
-              <option value="jpn" selected>日本語 (jpn)</option>
-              <option value="eng">英語 (eng)</option>
-            </select> <label class="inline-flex items-center gap-2 mt-2 text-sm"> <input type="checkbox" id="autoOcr"
-                checked /> <span>自動でOCRフォールバックする</span> </label> </div>
+        <div class="footer">
+          <div class="small">Worker: <span id="workerInfo">未設定</span></div>
+          <div><button id="clearBtn" class="btn">クリア</button></div>
         </div>
       </div>
-      <div class="md:col-span-2">
-        <div class="p-4 bg-white rounded-lg shadow-sm" style="min-height:420px; display:flex; flex-direction:column;">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-gray-900">PDF プレビュー（クリックで一文取得）</h3>
-            <div class="text-sm text-gray-500" id="status">ファイル未選択</div>
+
+      <div class="panel">
+        <div class="controls">
+          <div id="canvasArea" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:220px">
           </div>
-          <div id="viewerWrap" class="flex-1 bg-gray-50 border border-gray-200 rounded overflow-auto mb-4"
-            style="padding:8px;">
-            <div id="viewer" class="space-y-6"></div>
-          </div>
-          <div id="extractor" class="p-3 bg-white rounded-md border">
-            <div class="flex items-center justify-between mb-2">
-              <h4 class="font-semibold">抽出 / 引用生成</h4>
-              <div class="text-sm text-gray-500" id="extractStatus">未抽出</div>
+
+          <div style="width:360px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div id="spin" class="spinner" style="display:none"></div>
+              <div id="message">結果はここに表示されます</div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div class="md:col-span-2">
-                <div class="mb-2"> <label class="text-sm text-gray-600">キーワード（任意）</label> <input id="keywordInput"
-                    class="w-full mt-1 p-2 border rounded" placeholder="例: センサー, エラー" /> </div>
-                <div class="mb-2"> <label class="text-sm text-gray-600">抽出されたテキスト（一部）</label> <textarea
-                    id="extractedText" rows="6" class="w-full mt-1 p-2 border rounded font-sans text-sm"
-                    readonly></textarea> </div>
-                <div class="flex gap-2"> <button id="doExtract"
-                    class="px-4 py-2 bg-blue-500 text-white rounded">全文抽出（表示）</button> <button id="genQuotes"
-                    class="px-4 py-2 bg-green-600 text-white rounded">引用を自動生成</button> <button id="clearExtract"
-                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded">クリア</button> </div>
-              </div>
-              <div class="md:col-span-1">
-                <div class="mb-2 text-sm text-gray-600">設定</div>
-                <div class="space-y-2">
-                  <div> <label class="text-xs text-gray-500">最小文字数</label> <input id="minLen" type="number" value="15"
-                      class="w-full mt-1 p-1 border rounded text-sm" /> </div>
-                  <div> <label class="text-xs text-gray-500">最大文字数</label> <input id="maxLen" type="number" value="160"
-                      class="w-full mt-1 p-1 border rounded text-sm" /> </div>
-                  <div> <label class="text-xs text-gray-500">候補数</label> <input id="numCandidates" type="number"
-                      value="6" class="w-full mt-1 p-1 border rounded text-sm" /> </div>
-                </div>
-              </div>
+
+            <textarea id="ocrText" rows="12" placeholder="OCR 結果がここに表示されます..."></textarea>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button id="downloadText" class="btn">テキストをダウンロード</button>
+              <button id="copyBtn" class="btn">全文コピー</button>
+              <button id="splitBtn" class="btn">文を抽出</button>
+              <button id="extractRefsBtn" class="btn">参考文献を抽出してメタデータ取得</button>
+              <button id="exportBibBtn" class="btn">BibTeX ダウンロード</button>
             </div>
-            <hr class="my-3" />
-            <div>
-              <h5 class="text-md font-medium mb-2">生成された引用候補（クリックでコピー）</h5>
-              <div id="quotesArea" class="space-y-2"></div>
+
+            <div class="small" style="margin-top:6px;">
+              <label><input type="checkbox" id="chkAutoRefs" checked> 初回コピーで参考文献自動生成</label>
+              &nbsp; <label><input type="checkbox" id="chkExcludeSup" checked> 脚注番号をコピーしない</label>
             </div>
-            <div class="mt-3 text-sm text-gray-500">選択中の文字数: <span id="selectionCount">0</span></div>
+
+            <div id="sentenceList" class="sentence-list small">抽出された文はここに表示されます</div>
+
+            <div class="tools-row">
+              <button id="collapseSpacesAll" class="btn">抽出文すべて：連続空白→単一空白</button>
+              <button id="collapseSpacesSelected" class="btn">選択中のみ：連続空白→単一空白</button>
+              <button id="deleteContainsSpace" class="btn">半角空白を含む文を削除（確認）</button>
+            </div>
+
+            <div id="refs" class="refs"></div>
           </div>
         </div>
       </div>
     </div>
+    <small class="small">※ 安定して動かすにはローカル HTTP サーバ（例: <code>npx http-server . -p 8080</code>）で開いてください。</small>
   </div>
 
+  <!-- libs -->
+  <script src="https://unpkg.com/pdfjs-dist@3.10.111/build/pdf.min.js"></script>
+  <script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+
+  <script>
+    // --- 初期 ---
+    const LOCAL_WORKER = '/pdf.worker.min.js';
+    const CDN_WORKER = 'https://unpkg.com/pdfjs-dist@3.10.111/build/pdf.worker.min.js';
+
+    const workerInfoEl = document.getElementById('workerInfo');
+    const statusEl = document.getElementById('status');
+    const progressBar = document.getElementById('progressBar');
+    const drop = document.getElementById('drop');
+    const fileInput = document.getElementById('file');
+    const canvasArea = document.getElementById('canvasArea');
+    const ocrText = document.getElementById('ocrText');
+    const spin = document.getElementById('spin');
+    const message = document.getElementById('message');
+    const splitBtn = document.getElementById('splitBtn');
+    const sentenceList = document.getElementById('sentenceList');
+    const refsDiv = document.getElementById('refs');
+    const extractRefsBtn = document.getElementById('extractRefsBtn');
+    const exportBibBtn = document.getElementById('exportBibBtn');
+    const chkAutoRefs = document.getElementById('chkAutoRefs');
+    const chkExcludeSup = document.getElementById('chkExcludeSup');
+
+    const collapseSpacesAllBtn = document.getElementById('collapseSpacesAll');
+    const collapseSpacesSelectedBtn = document.getElementById('collapseSpacesSelected');
+    const deleteContainsSpaceBtn = document.getElementById('deleteContainsSpace');
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = CDN_WORKER;
+    (async function tryLocalWorker() { try { const r = await fetch(LOCAL_WORKER, { method: 'HEAD' }); if (r.ok) { pdfjsLib.GlobalWorkerOptions.workerSrc = LOCAL_WORKER; workerInfoEl.textContent = '同一オリジン: /pdf.worker.min.js'; return; } } catch (e) { } workerInfoEl.textContent = 'CDN: pdf.worker (fallback)'; })();
+
+    // drag/drop UI
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); statusEl.textContent = 'ドロップでアップロード'; }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); statusEl.textContent = '準備完了'; }));
+    drop.addEventListener('drop', async (e) => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+    fileInput.addEventListener('change', e => { const f = e.target.files[0]; if (f) handleFile(f); });
+
+    document.getElementById('clearBtn').addEventListener('click', () => { canvasArea.innerHTML = ''; ocrText.value = ''; progressBar.style.width = '0%'; message.textContent = '結果はここに表示されます'; sentenceList.innerHTML = ''; refsDiv.innerHTML = ''; window._autoRefsDone = false; });
+    document.getElementById('downloadText').addEventListener('click', () => { const blob = new Blob([ocrText.value], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'ocr-result.txt'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
+
+    document.getElementById('copyBtn').addEventListener('click', async () => { try { const cleaned = postprocessOCR(ocrText.value); await navigator.clipboard.writeText(cleaned); alert('全文コピーしました'); if (chkAutoRefs.checked) await autoGenerateRefsOnce(cleaned); } catch (e) { alert('コピー失敗: ' + e); } });
+
+    // 文抽出
+    splitBtn.addEventListener('click', () => { const txt = ocrText.value.trim(); if (!txt) { alert('まず OCR を実行してください'); return; } const sents = splitIntoSentences(txt); renderSentenceList(sents); });
+
+    // collapse spaces buttons
+    collapseSpacesAllBtn.addEventListener('click', () => {
+      const items = Array.from(sentenceList.querySelectorAll('.sentence-item'));
+      if (!items.length) { alert('抽出された文がありません'); return; }
+      items.forEach(it => { const span = it.querySelector('.sentence-text'); span.textContent = collapseConsecutiveSpaces(span.textContent); });
+      message.textContent = '抽出文すべて：連続空白を単一空白にしました';
+    });
+
+    collapseSpacesSelectedBtn.addEventListener('click', () => {
+      const checked = Array.from(sentenceList.querySelectorAll('.sentence-item input[type=checkbox]:checked'));
+      if (!checked.length) { alert('左のチェックで文を選択してください'); return; }
+      checked.forEach(ch => { const it = ch.closest('.sentence-item'); const span = it.querySelector('.sentence-text'); span.textContent = collapseConsecutiveSpaces(span.textContent); });
+      message.textContent = `選択中 ${checked.length} 件を処理しました`;
+    });
+
+    deleteContainsSpaceBtn.addEventListener('click', () => {
+      const items = Array.from(sentenceList.querySelectorAll('.sentence-item'));
+      const has = items.filter(it => /\x20/.test(it.querySelector('.sentence-text').textContent));
+      if (!has.length) { alert('半角空白を含む文はありません'); return; }
+      if (!confirm(`${has.length} 件の文に半角空白が見つかりました。これらを一覧から削除しますか？ (取り消せません)`)) return;
+      has.forEach(it => it.remove());
+      message.textContent = `${has.length} 件を削除しました`;
+    });
+
+    // 参考文献抽出トリガー
+    extractRefsBtn.addEventListener('click', async () => {
+      const txt = ocrText.value.trim() || '';
+      if (!txt) { alert('まず OCR を実行してください'); return; }
+      refsDiv.innerText = '解析中...';
+      try {
+        const res = await extractAndResolveRefs(txt);
+        renderRefResults(res);
+        window.refsCache = res;
+      } catch (e) { refsDiv.innerText = '参照抽出エラー: ' + e; }
+    });
+
+    exportBibBtn.addEventListener('click', () => {
+      const res = window.refsCache || [];
+      if (!res.length) { alert('参考文献がありません'); return; }
+      const bibs = res.map(r => crossrefToBibtex(r.crossref)).filter(Boolean).join('\n\n');
+      const blob = new Blob([bibs], { type: 'text/plain;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'refs.bib'; a.click();
+    });
+
+    // --- OCR & PDF 処理 ---
+    async function handleFile(file) {
+      ocrText.value = ''; progressBar.style.width = '0%'; canvasArea.innerHTML = ''; sentenceList.innerHTML = ''; refsDiv.innerHTML = ''; statusEl.textContent = 'PDF 読み込み中...';
+      try {
+        const buf = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: buf });
+        const pdf = await loadingTask.promise;
+        statusEl.textContent = `ページ数: ${pdf.numPages}`;
+
+        const tWorker = Tesseract.createWorker({
+          logger: m => { if (m.status) message.textContent = m.status; if (typeof m.progress === 'number') progressBar.style.width = Math.round(m.progress * 100) + '%'; }
+        });
+        await tWorker.load();
+        try { await tWorker.loadLanguage('eng+jpn'); await tWorker.initialize('eng+jpn'); } catch (e) { await tWorker.loadLanguage('eng'); await tWorker.initialize('eng'); }
+        try { await tWorker.setParameters({ preserve_interword_spaces: '0', tessedit_pageseg_mode: '1' }); } catch (e) { }
+
+        let accumulated = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          statusEl.textContent = `ページ ${i} をレンダリング中...`;
+          const page = await pdf.getPage(i);
+          const scale = Math.max(1.8, Math.min(3.0, (window.devicePixelRatio || 1) * 2));
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          if (i === 1) { canvasArea.innerHTML = ''; canvasArea.appendChild(canvas); }
+          statusEl.textContent = `ページ ${i} を前処理中...`;
+          const pre = preprocessCanvas(canvas);
+          statusEl.textContent = `ページ ${i} を OCR 中...`;
+          spin.style.display = 'inline-block';
+          const r = await tWorker.recognize(pre);
+          spin.style.display = 'none';
+          const ptext = r && r.data && r.data.text ? r.data.text : '';
+          const cleanedPageText = postprocessOCR(ptext);
+          accumulated += `\n\n=== Page ${i} ===\n` + cleanedPageText;
+          ocrText.value = accumulated;
+          progressBar.style.width = Math.round((i / pdf.numPages) * 100) + '%';
+        }
+        statusEl.textContent = '完了';
+        await tWorker.terminate();
+      } catch (err) { console.error(err); statusEl.textContent = 'PDFの解析に失敗しました: ' + (err && err.message ? err.message : err); }
+    }
+
+    // --- 前処理 ---
+    function preprocessCanvas(srcCanvas) {
+      const w = srcCanvas.width, h = srcCanvas.height;
+      const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+      const ctx = tmp.getContext('2d');
+      ctx.drawImage(srcCanvas, 0, 0);
+      const img = ctx.getImageData(0, 0, w, h); const data = img.data;
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) { const r = data[i], g = data[i + 1], b = data[i + 2]; const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b); data[i] = data[i + 1] = data[i + 2] = gray; sum += gray; }
+      const avg = sum / (w * h); const thr = Math.max(70, Math.min(200, avg));
+      for (let i = 0; i < data.length; i += 4) { const v = data[i] > thr ? 255 : 0; data[i] = data[i + 1] = data[i + 2] = v; data[i + 3] = 255; }
+      ctx.putImageData(img, 0, 0);
+      return tmp;
+    }
+
+    // --- 自動後処理（ODR 対策） ---
+    function postprocessOCR(text) {
+      if (!text) return '';
+      let s = String(text);
+      // 行末ハイフン結合
+      s = s.replace(/-\s*[\r\n]+\s*/g, '');
+      // DOI/URL内の空白削除
+      s = s.replace(/(10\.\d{2,9})\s*\/\s*([^\s,;]+)/gi, '$1/$2');
+      s = s.replace(/https?:\/\/\s*/gi, m => m.replace(/\s+/g, ''));
+      s = s.replace(/https?:\/\/\S+\s+\S+/gi, match => match.replace(/\s+/g, ''));
+      // ラテンの一文字空き修正 (e x a -> exa)
+      s = s.replace(/\b(?:[A-Za-z]\s){2,}[A-Za-z]\b/g, seq => seq.replace(/\s+/g, ''));
+      s = s.replace(/([A-Za-z])\s+([A-Za-z]{2,})/g, (m, p1, p2) => p1 + p2);
+      // CJK 間や CJK<->Latin の余分な空白を削除（Unicode property があれば）
+      try {
+        s = s.replace(/([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])\s+([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])/gu, '$1$2');
+        s = s.replace(/([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])\s+([A-Za-z0-9])/gu, '$1$2');
+        s = s.replace(/([A-Za-z0-9])\s+([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])/gu, '$1$2');
+      } catch (e) {
+        s = s.replace(/([一-龯ぁ-ゔァ-ヴー])\s+([一-龯ぁ-ゔァ-ヴー])/g, '$1$2');
+      }
+      // 連続空白を単一空白に（自動では最小限に留める）
+      s = s.replace(/[ \t]{2,}/g, ' ');
+      s = s.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n');
+      s = s.split('\n').map(l => l.trim()).join('\n');
+      return s;
+    }
+
+    // --- 文抽出 ---
+    function splitIntoSentences(text) {
+      if (!text) return [];
+      const t = text.replace(/\r/g, '').replace(/\n+/g, '\n').trim();
+      const cleaned = t.replace(/=== Page \d+ ===/g, '');
+      const parts = cleaned.split(/(?<=。|！|？|\.|\!|\?)\s*/g).map(s => s.trim()).filter(Boolean);
+      const out = [];
+      for (let p of parts) {
+        if (!p) continue;
+        if (out.length && out[out.length - 1].length < 8 && p.length < 30) out[out.length - 1] += ' ' + p;
+        else out.push(p);
+      }
+      return out;
+    }
+
+    function renderSentenceList(sentences) {
+      sentenceList.innerHTML = '';
+      if (!sentences || sentences.length === 0) { sentenceList.textContent = '(文が見つかりません)'; return; }
+      sentences.forEach((s, idx) => {
+        const div = document.createElement('div'); div.className = 'sentence-item';
+        const cb = document.createElement('input'); cb.type = 'checkbox';
+        const btnCopy = document.createElement('button'); btnCopy.className = 'btn'; btnCopy.textContent = 'コピー';
+        btnCopy.addEventListener('click', async () => {
+          try {
+            const prepared = prepareCopyText(s);
+            await navigator.clipboard.writeText(prepared);
+            message.textContent = `文 ${idx + 1} をコピーしました`;
+            btnCopy.textContent = 'コピー済み'; setTimeout(() => btnCopy.textContent = 'コピー', 900);
+            if (chkAutoRefs.checked) autoGenerateRefsOnce(prepared);
+          } catch (e) { alert('コピー失敗'); }
+        });
+        const btnCollapse = document.createElement('button'); btnCollapse.className = 'btn'; btnCollapse.textContent = '連続空白→単一';
+        btnCollapse.addEventListener('click', () => { const span = div.querySelector('.sentence-text'); span.textContent = collapseConsecutiveSpaces(span.textContent); });
+        const btnDelete = document.createElement('button'); btnDelete.className = 'btn'; btnDelete.textContent = '削除';
+        btnDelete.addEventListener('click', () => { if (confirm('この文を削除しますか？')) { div.remove(); } });
+        const span = document.createElement('div'); span.className = 'sentence-text'; span.textContent = s;
+        div.appendChild(cb); div.appendChild(btnCopy); div.appendChild(btnCollapse); div.appendChild(btnDelete); div.appendChild(span);
+        sentenceList.appendChild(div);
+      });
+    }
+
+    // collapse consecutive spaces -> single
+    function collapseConsecutiveSpaces(s) {
+      if (!s) return s;
+      return s.replace(/ {2,}/g, ' ');
+    }
+
+    // prepare copy (脚注番号の除去等)
+    function prepareCopyText(raw) {
+      let s = raw || '';
+      if (chkExcludeSup && chkExcludeSup.checked) s = s.replace(/\s*\d+\s*/g, ' ');
+      s = s.replace(/-\s*\n\s*/g, ''); s = s.replace(/\n+/g, '\n');
+      s = s.replace(/=== Page \d+ ===/g, '');
+      s = s.replace(/\b(?:[A-Za-z]\s){2,}[A-Za-z]\b/g, seq => seq.replace(/\s+/g, ''));
+      try { s = s.replace(/([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])\s+([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])/gu, '$1$2'); }
+      catch (e) { s = s.replace(/([一-龯ぁ-ゔァ-ヴー])\s+([一-龯ぁ-ゔァ-ヴー])/g, '$1$2'); }
+      s = s.replace(/([A-Za-z])\s+([A-Za-z]{2,})/g, (m, p1, p2) => p1 + p2);
+      return s.trim();
+    }
+
+    // --- 参考文献抽出 & CrossRef ---
+    function extractDOI(text) {
+      const doiRegex = /\b(10\.\d{4,9}\/[^\s"'<>\[\],;]+)/i;
+      const m = text.match(doiRegex);
+      return m ? m[1] : null;
+    }
+
+    async function crossrefLookupByDOI(doi) {
+      const url = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('CrossRef fetch failed: ' + r.status);
+      const json = await r.json();
+      return json.message;
+    }
+
+    async function crossrefSearchByTitle(title) {
+      const url = `https://api.crossref.org/works?query.title=${encodeURIComponent(title)}&rows=1`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('CrossRef search failed: ' + r.status);
+      const json = await r.json();
+      return (json.message && json.message.items && json.message.items[0]) || null;
+    }
+
+    function splitReferenceEntries(fullText) {
+      const idx = fullText.search(/(^|\n)(References|参考文献|Bibliography|REFERENCES)(\n|$)/i);
+      const body = idx >= 0 ? fullText.slice(idx) : fullText;
+      const candidates = body.split(/\n{2,}|\n(?=\d+[\).]\s)/).map(s => s.trim()).filter(Boolean);
+      return candidates;
+    }
+
+    async function extractAndResolveRefs(ocrTextContent, onProgress = () => { }) {
+      const cleaned = postprocessOCR(ocrTextContent);
+      const entries = splitReferenceEntries(cleaned);
+      const results = [];
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        onProgress({ i, total: entries.length, entry });
+        const doi = extractDOI(entry);
+        try {
+          let meta = null;
+          if (doi) { try { meta = await crossrefLookupByDOI(doi); } catch (e) { console.warn('DOI lookup failed', e); } }
+          if (!meta) {
+            let titleTry = null;
+            const q = entry.match(/[“"«]([^”"»]{10,200})[”"»]/);
+            if (q) titleTry = q[1];
+            else {
+              const afterAuthors = entry.replace(/^[^.]*\.\s*/, '');
+              const maybe = afterAuthors.split(/\.\s/)[0];
+              if (maybe && maybe.length > 10 && maybe.length < 300) titleTry = maybe;
+            }
+            if (titleTry) meta = await crossrefSearchByTitle(titleTry);
+          }
+          const out = {
+            raw: entry,
+            doi: meta ? meta.DOI : doi || null,
+            title: meta ? (meta.title && meta.title[0]) : null,
+            authors: meta ? (meta.author || []).map(a => (a.family ? a.family + (a.given ? ', ' + a.given : '') : (a.name || ''))) : [],
+            journal: meta ? (meta['container-title'] && meta['container-title'][0]) : null,
+            year: meta ? (meta.issued && meta.issued['date-parts'] && meta.issued['date-parts'][0] && meta.issued['date-parts'][0][0]) : null,
+            crossref: meta || null
+          };
+          results.push(out);
+        } catch (err) {
+          console.error(err);
+          results.push({ raw: entry, error: String(err) });
+        }
+        await new Promise(r => setTimeout(r, 300));
+      }
+      return results;
+    }
+
+    function renderRefResults(results) {
+      refsDiv.innerHTML = '';
+      if (!results || results.length === 0) { refsDiv.textContent = '(参考文献が見つかりません)'; return; }
+      results.forEach(r => {
+        const el = document.createElement('div'); el.className = 'refItem';
+        if (r.error) {
+          el.textContent = '失敗: ' + r.error + '\n' + r.raw;
+        } else {
+          const authors = r.authors && r.authors.length ? r.authors.join('; ') : '(N/A)';
+          el.innerHTML = `<strong>${escapeHtml(r.title || '(タイトル取得失敗)')}</strong>
+            <div class="small">著者: ${escapeHtml(authors)}</div>
+            <div class="small">雑誌: ${escapeHtml(r.journal || '')} / 年: ${escapeHtml(String(r.year || ''))} / DOI: ${escapeHtml(r.doi || '')}</div>
+            <div style="margin-top:6px"><button class="btn copyJson">JSONをコピー</button> <button class="btn openDoi">DOI を開く</button></div>`;
+          el.querySelector('.copyJson').addEventListener('click', () => { navigator.clipboard.writeText(JSON.stringify(r.crossref || {}, null, 2)).then(() => alert('コピーしました')); });
+          el.querySelector('.openDoi').addEventListener('click', () => { if (r.doi) window.open('https://doi.org/' + encodeURIComponent(r.doi), '_blank'); else alert('DOI がありません'); });
+        }
+        refsDiv.appendChild(el);
+      });
+      window.refsCache = results;
+    }
+
+    function crossrefToBibtex(meta) {
+      if (!meta) return null;
+      const year = (meta.issued && meta.issued['date-parts'] && meta.issued['date-parts'][0] && meta.issued['date-parts'][0][0]) || '';
+      const authors = (meta.author || []).map(a => `${a.given || ''} ${a.family || ''}`.trim()).join(' and ');
+      const key = (meta.author && meta.author[0] && meta.author[0].family ? meta.author[0].family.split(' ')[0] : 'item') + year;
+      const type = (meta.type || 'article-journal').replace(' ', '-');
+      return `@${type}{${key},
+  title = {${meta.title ? meta.title[0] : ''}},
+  author = {${authors}},
+  journal = {${meta['container-title'] ? meta['container-title'][0] : ''}},
+  year = {${year}},
+  doi = {${meta.DOI || ''}}
+}`;
+    }
+
+    async function autoGenerateRefsOnce(text) {
+      if (window._autoRefsDone) return;
+      window._autoRefsDone = true;
+      refsDiv.innerText = '初回参考文献自動生成中...';
+      try {
+        const res = await extractAndResolveRefs(text);
+        renderRefResults(res);
+      } catch (e) { refsDiv.textContent = '自動生成に失敗: ' + e; }
+    }
+
+    function escapeHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;'); }
+
+    // --- ユーティリティ ---
+    // 最後に一覧からテキストを取るなど必要なら関数を追加してください
+  </script>
 </body>
 
 </html>
